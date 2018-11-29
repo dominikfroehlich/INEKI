@@ -1,0 +1,522 @@
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(warning = FALSE, echo = FALSE)
+```
+
+
+INEKI Toolbox v7
+
+Create call file (see comments)
+<!-- library(rmarkdown) -->
+
+<!-- # Todo: clean up code -->
+<!-- # -------------------------- -->
+<!-- # adapt legend: do not show the new ones in the charts without new nodes! -->
+
+
+<!-- #filename <- "ORG" #ohne Dateiendung (Survey; IA-Datei heißt gleich mit ORG hinten dran) -->
+
+<!-- # Farbliches -->
+<!-- highlight.iwb1 <- "yellow" -->
+<!-- highlight.iwb2 <- "orange" -->
+<!-- highlight.iwb3 <- "red" -->
+<!-- highlight.iwb4 <- "grey" -->
+
+<!-- # Inhaltiche Einstellungen -->
+<!-- cut.off <- 3 #Bei den Netzwerkfragen: Bis zu welchem Wert sollen die Angaben ignoriert werden -->
+<!-- minTimeInOrganization <- 1 #KLEINER GLEICH wird gelöscht -->
+
+<!-- # Technische Einstellungen -->
+<!-- options(digits = 1) # Anzahl Kommastellen -->
+<!-- set.seed(1)  # (replizierbare) Zufallsdarstellung -->
+
+
+
+
+<!-- filename_list <- list(#"org1", "org2" -->
+<!--   ) -->
+<!-- for(filename in filename_list){ -->
+
+
+<!-- # Hier werden die Daten vom Innovationsagenten eingespielt. -->
+<!-- orgData <- read.csv2(file = paste0("Daten//",filename,"ORG.csv"), sep=";", header = T, check.names = T) -->
+<!-- orgData <- orgData[1, 1:3] -->
+
+<!-- orgName <- orgData$OrgName -->
+<!-- orgMAAnzahl <- orgData$MAAnzahl # Wieviele MitarbeiterInnen hat das relevante Netzwerk maximal -->
+<!-- orgSektor <- orgData$Sektor -->
+
+
+<!-- rmarkdown::render(input = "header_beamer.Rmd", output_file = paste0("Reports/Report ",orgData$OrgName,".pdf")) -->
+<!-- rmarkdown::render(input = "header_Hilfe_pdf.Rmd", output_file = paste0("Reports/Interpretationshilfe ",orgData$OrgName,".pdf")) -->
+
+<!-- } -->
+
+
+```{r setup_data, include=FALSE, echo=FALSE}
+knitr::opts_chunk$set(
+	message = FALSE
+)
+
+library(igraph)
+
+df.raw <- read.csv2(file = paste0("Daten//",filename,".csv"), sep=";", header = T, check.names = T) #TBA file auswählen, bzw. call von wo anders 
+
+# Identify all empty rows -- these will later on be deleted, as well as the respective columns in the sociometric questions!
+empty.rows <- which(df.raw$IWBC11.1. %in% NA)
+if(length(empty.rows)==0){ #If no missing, you have to add max+1 (rows)
+  empty.rows <- nrow(df.raw)+1
+}
+
+df <- df.raw[-empty.rows, c(9:197)] #-c(7, 9, 15:17) weg
+
+
+
+nodes <- df[, 1:39]
+
+# Wie intensiv haben Sie mit diesen Personen im Rahmen des Projektes zusammengearbeitet
+nw1 <- df[, grep("IWBC11.", names(df), value = T, fixed = T)]
+nw1 <- nw1[, -empty.rows] 
+len <- length(nw1)
+#External network: only use numers (11b), not names, as they may be confidential (11a). The innovation agent can still check back if this seems necessary.
+nw1ext <- df[, grep("IWBC11b.", names(df), value = T, fixed = T)]
+#nw1 <- nw1[, -empty.rows] 
+
+
+# 0. aus limesurvey: NamesID (dropbdown namen, hinterlegt mit zahlen).
+# 1. sortieren Datenset nach Namenscode (1:max nach spaltenzahl)
+# 2- Überprüfen ob werte fehlen, die merken und die Spalten löschen
+# Zeilen müssen nicht hinzugefügt werden / gelöscht werden.
+
+# Wenn ich Informationen/Feedback für bzw. über das Projekt brauchte
+nw2 <- df[, grep("IWBC12.", names(df), value = T, fixed = T)]
+nw2 <- nw2[, -empty.rows]
+nw2 <- nw2[, 1:len]
+
+
+# Wie würden Sie die Rolle dieser Person in diesem Projekt benennen?
+nw3 <- df[, grep("IWBC13.", names(df), value = T, fixed = T)]
+nw3 <- nw3[, -empty.rows]
+nw3 <- nw3[, 1:len]
+
+nw4 <- df[, grep("IWBD14.", names(df), value = T, fixed = T)]
+nw4firmen <- as.vector(t(df[, grep("T1", names(df), value = T, fixed = T)]))
+nw4personen<- as.vector(t(df[, grep("T2", names(df), value = T, fixed = T)]))
+
+#Calc IWB:
+nodes$iwb0 <- rowMeans(nodes[, 22:29], na.rm = T)
+nodes$iwb1 <- rowMeans(nodes[, 22:23], na.rm = T)
+nodes$iwb2 <- rowMeans(nodes[, 24:25], na.rm = T)
+nodes$iwb3 <- rowMeans(nodes[, 26:27], na.rm = T)
+nodes$iwb4 <- rowMeans(nodes[, 28:29], na.rm = T)
+nodes$id <- 1:len
+# nodes$dominant <- if(nodes$iwb1)
+
+  
+  
+#   dfx <- nodes[, 41:44]
+# names(dfx)[
+#   
+#   which.max(lapply(as.matrix(dfx), MARGIN = 2, max))
+#   
+#   ]
+
+
+# a <- rnorm(n = 10)
+# b <- rnorm(n = 10)
+# c <- rnorm(n = 10)
+# df <- data.frame(a, b, c)
+# 
+# df <- df[1:2, ] #c
+# df
+# 
+# names(df)[which.max(apply(df, MARGIN = 2, max))]
+# mat <- cbind(df,apply(as.matrix(df), 1, max$label))
+# mat
+
+#TBA: Typen in Karte anzeigen
+
+
+IDs <-  1:len # anpassen wenn limesurvey mit ID
+row.names(nw1) <- IDs 
+colnames(nw1) <- IDs
+
+# extLen <- length(nw1ext)
+# row.names(nw1ext) <- IDs 
+# extIDs <- paste0("EXT", 1:len)
+# colnames(nw1ext) <- extIDs
+
+row.names(nw2) <- IDs 
+colnames(nw2) <- IDs
+
+row.names(nw3) <- IDs 
+colnames(nw3) <- IDs
+
+
+nw1 <- as.matrix(nw1)
+nw1[is.na(nw1)] <- 0
+nw1ext <- as.matrix(nw1ext)
+nw2 <- as.matrix(nw2)
+nw2[is.na(nw2)] <- 0
+nw3 <- as.matrix(nw3)
+
+# i for igraph network  
+i_nw1 <- graph_from_adjacency_matrix(nw1, mode = c("directed"), weighted = TRUE, diag = FALSE, add.colnames = NULL, add.rownames = NA)
+
+i_nw2 <- graph_from_adjacency_matrix(nw2, mode = c("directed"), weighted = TRUE, diag = FALSE, add.colnames = NULL, add.rownames = NA)
+
+i_nw3 <- graph_from_adjacency_matrix(nw3, mode = c("directed"), weighted = TRUE, diag = FALSE, add.colnames = NULL, add.rownames = NA)
+
+# Remove edges < cut.off, s = sparse
+is_nw1 <- delete_edges(graph = i_nw1, edges = E(i_nw1)[which(weight <= cut.off)])
+is_nw2 <- delete_edges(graph = i_nw2, edges = E(i_nw2)[which(weight <= cut.off)])
+is_nw3 <- delete_edges(graph = i_nw3, edges = E(i_nw3)[which(weight <= cut.off)])
+
+
+
+
+nodes$outdeg <- strength(is_nw1, mode = c("out"), loops = FALSE)
+nodes$indeg <- strength(is_nw1, mode = c("in"), loops = FALSE)
+nodes$betw <- betweenness(is_nw1, weights = E(is_nw1)$weight, normalized = TRUE)
+
+nodes$outdeg2 <- strength(is_nw2, mode = c("out"), loops = FALSE)
+nodes$indeg2 <- strength(is_nw2, mode = c("in"), loops = FALSE)
+nodes$betw2 <- betweenness(is_nw2, weights = E(is_nw2)$weight, normalized = TRUE)
+nodes$indeg2[is.na(nodes$indeg2)] <- 0 #TBA do for all
+
+
+V(is_nw1)$name <- labels(nodes)[[1]]
+is_nw1 <- set_vertex_attr(is_nw1, name = "outdeg", index = V(is_nw1), nodes$outdeg)
+is_nw1 <- set_vertex_attr(is_nw1, name = "indeg", index = V(is_nw1), nodes$indeg)
+is_nw1 <- set_vertex_attr(is_nw1, name = "betw", index = V(is_nw1), nodes$betw)
+is_nw1 <- set_vertex_attr(is_nw1, name = "iwb0", index = V(is_nw1), nodes$iwb0)
+is_nw1 <- set_vertex_attr(is_nw1, name = "iwb1", index = V(is_nw1), nodes$iwb1)
+is_nw1 <- set_vertex_attr(is_nw1, name = "iwb2", index = V(is_nw1), nodes$iwb2)
+is_nw1 <- set_vertex_attr(is_nw1, name = "iwb3", index = V(is_nw1), nodes$iwb3)
+is_nw1 <- set_vertex_attr(is_nw1, name = "iwb4", index = V(is_nw1), nodes$iwb4)
+is_nw1 <- set_vertex_attr(is_nw1, name = "Name", index = V(is_nw1), nodes$A1.1.)
+is_nw1 <- set_vertex_attr(is_nw1, name = "OrgXP", index = V(is_nw1), nodes$A2)
+
+V(is_nw2)$name <- labels(nodes)[[1]]
+is_nw2 <- set_vertex_attr(is_nw2, name = "outdeg2", index = V(is_nw2), nodes$outdeg2)
+is_nw2 <- set_vertex_attr(is_nw2, name = "indeg2", index = V(is_nw2), nodes$indeg2)
+is_nw2 <- set_vertex_attr(is_nw2, name = "betw2", index = V(is_nw2), nodes$betw2)
+is_nw2 <- set_vertex_attr(is_nw2, name = "iwb0", index = V(is_nw2), nodes$iwb0)
+is_nw2 <- set_vertex_attr(is_nw2, name = "iwb1", index = V(is_nw2), nodes$iwb1)
+is_nw2 <- set_vertex_attr(is_nw2, name = "iwb2", index = V(is_nw2), nodes$iwb2)
+is_nw2 <- set_vertex_attr(is_nw2, name = "iwb3", index = V(is_nw2), nodes$iwb3)
+is_nw2 <- set_vertex_attr(is_nw2, name = "iwb4", index = V(is_nw2), nodes$iwb4)
+is_nw2 <- set_vertex_attr(is_nw2, name = "Name", index = V(is_nw2), nodes$A1.1.)
+is_nw2 <- set_vertex_attr(is_nw2, name = "OrgXP", index = V(is_nw2), nodes$A2)
+
+# V(is_nw3)$name <- labels(nodes)[[1]]
+# is_nw3 <- set_vertex_attr(is_nw3, name = "outdeg", index = V(is_nw3), nodes$outdeg)
+# is_nw3 <- set_vertex_attr(is_nw3, name = "indeg", index = V(is_nw3), nodes$indeg)
+# is_nw3 <- set_vertex_attr(is_nw3, name = "betw", index = V(is_nw3), nodes$betw)
+# is_nw3 <- set_vertex_attr(is_nw3, name = "iwb0", index = V(is_nw3), nodes$iwb0)
+# is_nw3 <- set_vertex_attr(is_nw3, name = "iwb1", index = V(is_nw3), nodes$iwb1)
+# is_nw3 <- set_vertex_attr(is_nw3, name = "iwb2", index = V(is_nw3), nodes$iwb2)
+# is_nw3 <- set_vertex_attr(is_nw3, name = "iwb3", index = V(is_nw3), nodes$iwb3)
+# is_nw3 <- set_vertex_attr(is_nw3, name = "iwb4", index = V(is_nw3), nodes$iwb4)
+# is_nw3 <- set_vertex_attr(is_nw3, name = "Name", index = V(is_nw3), nodes$A1.1.)
+
+```
+
+```{r import_data2, include=FALSE}
+
+```
+
+
+```{r child='Allgemeines.Rmd'}
+```
+
+
+
+
+
+# Über die Organisation
+## Allgemeines
+
+- Organisation/Bereich: `r orgName`
+- Branche: `r orgSektor`
+- Anzahl MitarbeiterInnen: `r orgMAAnzahl`
+- Response-Rate bei Survey: `r (checkResp <- len/orgMAAnzahl*100)`
+
+`r if(checkResp<70){"ACHTUNG - ZU GERINGE RÜCKLAUFQUOTE!"}`
+
+## TeilnehmerInnen
+Hier ist die Übersicht über die Personen, die teilgenommen haben.
+```{r table, warning=FALSE, echo = FALSE}
+
+colnames(nodes)[c(1,2)] <- c("Vorname", "Nachname")
+print(nodes[,1:2])
+```
+
+## Kontext
+```{r, echo=FALSE}
+digi <- data.frame(1:10)
+digi$product <-  sum(df.raw$D18.1.=="1", na.rm = T)
+digi$process <- sum(df.raw$D18.2. =="1", na.rm = T)
+digi$orga <- sum(df.raw$D18.3. =="1", na.rm = T)
+digi$business <- sum(df.raw$D18.4. =="1", na.rm = T)
+
+digi[1, 2:5]
+
+```
+
+# Die wichtigsten Player
+
+## Die wichtigsten formalen Broker
+
+```{r include=FALSE}
+
+nw1.attr <- data.frame(vertex_attr(is_nw1, name = "name"),
+                       vertex_attr(is_nw1, name = "outdeg"),
+                       vertex_attr(is_nw1, name = "indeg"),
+                       vertex_attr(is_nw1, name = "betw"),
+                       vertex_attr(is_nw1, name = "iwb0"),
+                       vertex_attr(is_nw1, name = "iwb1"),
+                       vertex_attr(is_nw1, name = "iwb2"),
+                       vertex_attr(is_nw1, name = "iwb3"),
+                       vertex_attr(is_nw1, name = "iwb4"))
+colnames(nw1.attr) <- c("name","outdeg","indeg","betw","iwb0","iwb1","iwb2","iwb3","iwb4")
+
+nw1.attr[is.na(nw1.attr)] <- 0
+
+nw1.attr$deg <- nw1.attr$indeg + nw1.attr$outdeg
+
+
+nw2.attr <- data.frame(vertex_attr(is_nw2, name = "name"),
+                       vertex_attr(is_nw2, name = "outdeg2"),
+                       vertex_attr(is_nw2, name = "indeg2"),
+                       vertex_attr(is_nw2, name = "betw2"),
+                       vertex_attr(is_nw2, name = "iwb0"),
+                       vertex_attr(is_nw2, name = "iwb1"),
+                       vertex_attr(is_nw2, name = "iwb2"),
+                       vertex_attr(is_nw2, name = "iwb3"),
+                       vertex_attr(is_nw2, name = "iwb4"))
+colnames(nw2.attr) <- c("name","outdeg","indeg","betw","iwb0","iwb1","iwb2","iwb3","iwb4")
+
+nw2.attr[is.na(nw2.attr)] <- 0
+
+nw2.attr$deg <- nw2.attr$indeg + nw2.attr$outdeg
+
+```
+
+
+
+```{r}
+head(nw1.attr[order(nw1.attr$betw, decreasing = T),c("name", "betw")], n = 5)
+```
+
+
+## Die formal zentralsten Personen
+
+```{r}
+head(nw1.attr[order(nw1.attr$deg, decreasing = T),c("name", "deg")], n = 5)
+```
+
+## Die wichtigsten informellen Broker
+
+```{r}
+head(nw2.attr[order(nw2.attr$betw, decreasing = T),c("name", "betw")], n = 5)
+```
+
+
+## Die informal zentralsten Personen
+
+```{r}
+head(nw2.attr[order(nw2.attr$deg, decreasing = T),c("name", "deg")], n = 5)
+```
+
+
+
+
+
+# Heatmap: Opportunity Exploration
+
+
+## Info
+Es werden die Personen farblich markiert, die häufig nach Problemen und Potenzialen gesucht haben. 
+
+(Häufig bedeutet öfter als 75% der restlichen MitarbeiterInnen.)
+
+Die Linien zeigen, wer mit wem im Rahmen von innovativen Projekten intensiv zusammengearbeitet hat (formales Netzwerk) bzw. voneinander Feedback gesucht hat (informales Netzwerk). Je größer die Knoten, desto zentaler sind die Knoten im Netzwerk.
+
+```{r print_graph}
+#TODO: implement using source()
+
+
+layouts = c(#"layout.random",
+   "layout.graphopt",#,
+  "layout.circle",
+  "layout.sphere",
+    #"layout.kamada.kawai",
+  #"layout.spring",
+  #"layout.reingold.tilford",
+  #"layout.fruchterman.reingold.grid",
+  #"layout.lgl",
+  "layout.fruchterman.reingold"#,
+  #"layout.svd",
+  #"layout_on_grid"
+  )
+
+
+
+print_graphBW <- function(network, attribute, title, highlight.color){
+  set.seed(1)
+  V(network)$color <- ifelse(attribute >= quantile(attribute)[[4]], yes = highlight.color, no = "white")
+  
+  for (alg in layouts) {
+    
+    coords <- do.call(alg, list(network))
+    
+    
+      cat("\n")
+      cat(paste("##",title))#,"[", alg,"]", sep = " "))
+      cat("\n")
+    
+    plot.igraph(simplify(network, remove.loops = T),
+                layout=coords,
+                vertex.size  = (V(network)$betw/max(V(network)$betw)+1)*10,
+                  #(V(network)$betw+0.8)*20,
+                edge.arrow.size=0.8,
+                #vertex.color = V(is_nw1)$iwb1,
+                edge.width   = E(network)$weight/1.6
+                #vertex.label=V(network)$Name
+    )
+    
+    cat("\\begin{tiny}")
+    
+    print(nodes[,c("Vorname", "Nachname")])
+    
+    cat("\\end{tiny}")
+    
+    cat("\n")
+  
+
+  }
+  #title(main = title)#, sub = "Cut-Off = 5, Red = IWB > Mean, Vertex Size = Betw.")  
+}
+
+
+
+# Informell
+print_graphID <- function(network, attribute, title, highlight.color){
+set.seed(1)
+  V(network)$color <- ifelse(attribute >= quantile(attribute)[[4]], yes = highlight.color, no = "white")
+  
+  for (alg in layouts) {
+    
+    coords <- do.call(alg, list(network))
+    
+    
+      cat("\n")
+      cat(paste("##",title))#,"[", alg,"]", sep = " "))
+      cat("\n")
+    
+plot(simplify(network, remove.loops = T),
+     layout=coords,
+     vertex.size  = ((V(network)$indeg2)/max(V(network)$indeg2)+1)*10,
+     edge.arrow.size=1,
+     #vertex.color = V(is_nw2)$iwb1,
+     edge.width   = E(network)$weight/1.6,
+     rescale = T
+     )
+    
+    cat("\\begin{tiny}")
+    
+    print(nodes[,c("Vorname", "Nachname")])
+    
+    cat("\\end{tiny}")
+    
+    cat("\n")
+  
+
+  }
+}
+
+```
+
+
+```{r eval=FALSE, include=FALSE}
+#png("figure/centrality.png", 800, 800)
+#print_graphBW(is_nw1, V(is_nw1)$iwb1, title = "Beispiel")
+#dev.off()
+```
+
+
+
+```{r iwb1, echo = FALSE, results='asis'}
+print_graphBW(is_nw1, V(is_nw1)$iwb1, "Opp. Exploration / Formal", highlight.iwb1)
+is_nw1_filter.OrgXP <- delete.vertices(graph = is_nw1, V(is_nw1)$OrgXP<=minTimeInOrganization)
+print_graphBW(is_nw1_filter.OrgXP, V(is_nw1_filter.OrgXP)$iwb1, "Opp. Exploration / Formal ohne neue MA", highlight.iwb1)
+
+print_graphID(is_nw2, V(is_nw2)$iwb1, "Opp. Exploration / Informal", highlight.iwb1)
+is_nw2_filter.OrgXP <- delete.vertices(graph = is_nw2, V(is_nw2)$OrgXP<=minTimeInOrganization)
+print_graphID(is_nw2_filter.OrgXP, V(is_nw2_filter.OrgXP)$iwb1, "Opp. Exploration / Informal ohne neue MA", highlight.iwb1)
+```
+
+
+
+# Heatmap: Idea Generation
+
+## Info
+Es werden die Personen farblich markiert, die häufig versuchen neue Ideen zu generieren. Die Linien zeigen, wer mit wem im Rahmen von innovativen Projekten intensiv zusammengearbeitet hat (formales Netzwerk) bzw. voneinander Feedback gesucht hat (informales Netzwerk). Je größer die Knoten, desto zentaler sind die Knoten im Netzwerk.
+
+```{r iwb2, echo = FALSE, results='asis'}
+print_graphBW(is_nw1, V(is_nw1)$iwb2, "Idea Generation / Formal", highlight.iwb2)
+is_nw1_filter.OrgXP <- delete.vertices(graph = is_nw1, V(is_nw1)$OrgXP<=minTimeInOrganization)
+print_graphBW(is_nw1_filter.OrgXP, V(is_nw1_filter.OrgXP)$iwb2, "Idea Generation / Formal ohne neue MA", highlight.iwb2)
+
+print_graphID(is_nw2, V(is_nw2)$iwb2, "Idea Generation / Informal", highlight.iwb2)
+is_nw2_filter.OrgXP <- delete.vertices(graph = is_nw2, V(is_nw2)$OrgXP<=minTimeInOrganization)
+print_graphID(is_nw2_filter.OrgXP, V(is_nw2_filter.OrgXP)$iwb2, "Idea Generation / Informal ohne neue MA", highlight.iwb2)
+```
+
+# Heatmap: Idea Promotion
+
+## Info
+Es werden die Personen farblich markiert, die häufig versuchen neue Ideen im Unternehmen bekannt zu machen.
+Die Linien zeigen, wer mit wem im Rahmen von innovativen Projekten intensiv zusammengearbeitet hat (formales Netzwerk) bzw. voneinander Feedback gesucht hat (informales Netzwerk). Je größer die Knoten, desto zentaler sind die Knoten im Netzwerk.
+
+```{r iwb3, echo = FALSE, results='asis'}
+print_graphBW(is_nw1, V(is_nw1)$iwb3, "Idea Promotion / Formal", highlight.iwb3)
+is_nw1_filter.OrgXP <- delete.vertices(graph = is_nw1, V(is_nw1)$OrgXP<=minTimeInOrganization)
+print_graphBW(is_nw1_filter.OrgXP, V(is_nw1_filter.OrgXP)$iwb3, "Idea Promotion / Formal ohne neue MA", highlight.iwb3)
+
+print_graphID(is_nw2, V(is_nw2)$iwb3, "Idea Promotion / Informal", highlight.iwb3)
+is_nw2_filter.OrgXP <- delete.vertices(graph = is_nw2, V(is_nw2)$OrgXP<=minTimeInOrganization)
+print_graphID(is_nw2_filter.OrgXP, V(is_nw2_filter.OrgXP)$iwb3, "Idea Promotion / Informal ohne neue MA", highlight.iwb3)
+```
+
+# Heatmap: Idea Realization
+
+## Info
+Es werden die Personen farblich markiert, die häufig versuchen neue Ideen im Unternehmen umzusetzen. 
+Die Linien zeigen, wer mit wem im Rahmen von innovativen Projekten intensiv zusammengearbeitet hat (formales Netzwerk) bzw. voneinander Feedback gesucht hat (informales Netzwerk). Je größer die Knoten, desto zentaler sind die Knoten im Netzwerk.
+
+```{r iwb4, echo = FALSE, results='asis'}
+print_graphBW(is_nw1, V(is_nw1)$iwb4, "Idea Realization / Formal", highlight.iwb4)
+is_nw1_filter.OrgXP <- delete.vertices(graph = is_nw1, V(is_nw1)$OrgXP<=minTimeInOrganization)
+print_graphBW(is_nw1_filter.OrgXP, V(is_nw1_filter.OrgXP)$iwb4, "Idea Realization / Formal ohne neue MA", highlight.iwb4)
+
+print_graphID(is_nw2, V(is_nw2)$iwb4, "Idea Realization / Informal", highlight.iwb4)
+is_nw2_filter.OrgXP <- delete.vertices(graph = is_nw2, V(is_nw2)$OrgXP<=minTimeInOrganization)
+print_graphID(is_nw2_filter.OrgXP, V(is_nw2_filter.OrgXP)$iwb4, "Idea Realization / Informal ohne neue MA", highlight.iwb4)
+```
+
+
+
+
+<!--# Beispiel-Interpretation-->
+
+
+# Externe Partner
+## Firmen
+```{r}
+nw4firmen[nw4firmen != ""]
+```
+## Ansprechpersonen
+```{r}
+nw4personen[nw4personen != ""]
+```
